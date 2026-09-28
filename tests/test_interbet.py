@@ -317,6 +317,62 @@ TENNIS_DOUBLES_HTML = """
 """
 
 
+# Real HTML captured from a live, plain GET to Interbet's public
+# FixedOdds/LoadCouponsPartial with SportID=76/SportTypeID=76 (Basketball)
+# and VenueID=56 ("Coming up" -- Basketball's only coupon venue, same
+# single-tab situation as Rugby/Cricket/Tennis; see scraper.py's
+# BASKETBALL_COMING_UP_VENUE_ID comment), trimmed of unrelated markup the
+# same way the other sports' *_SAMPLE_HTML constants are. Both fixtures
+# are real, unmodified field values:
+#   - Club Atletico Lanus v Gimnasia Esgrima Comodoro Rivadavia (Liga
+#     Nacional de Basquetbol) is a straightforward two-way market with no
+#     name-formatting quirk -- ParticipantName is just the team's name,
+#     case-folded, same order as EventDescription.
+#   - Etoile Charleville-Mezieres v Mulhouse Basket Agglomeration (French
+#     National Division 1) exercises a hyphenated club name the same way
+#     Soccer's "Bosnia-Herzegovina" and Rugby/Cricket's hyphenated team
+#     names do -- proving `_normalize_name`'s hyphen-folding is enough for
+#     Basketball too, with no Tennis-style surname-matching needed.
+# Neither fixture has a DRAW participant button -- no live Basketball
+# fixture checked while building this adapter did (93 fixtures across 26
+# competitions, all exactly 2 buttons each): a basketball game always
+# resolves to a winner, no draw is possible.
+BASKETBALL_SAMPLE_HTML = """
+<div class="sport">
+  <div class="sports_card">
+    <div class="sports_card_body">
+      <div class="sports_card_body_fixtures">
+        <div class="sport_fixture">
+          <div class="sport_fixture_title_group">
+            <span class="sport_fixture_title_text">29 Sep 2026 - 03:05</span>
+            <span class="sport_fixture_title_text">Club Atletico Lanus v Gimnasia Esgrima Comodoro Rivadavia</span>
+          </div>
+          <div class="sport_fixture_participant_odds">
+            <div id="Event-91345641" class="participant_match_odds">
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+3%3a05%3a00+AM&amp;EventParticipantID=344501975&amp;ParticipantName=CLUB+ATLETICO+LANUS&amp;EventID=91345641&amp;VenueID=2337239&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Basketball&amp;ImgId=76&amp;EventGroup=Liga+Nacional+de+Basquetbol&amp;EventDescription=Club+Atletico+Lanus+v+Gimnasia+Esgrima+Comodoro+Rivadavia&amp;AllowMultiple=True&amp;Odds=2.35&amp;OddsDisplay=2.35&amp;InRunning=N&amp;InRunningDelay=0" id="344501975-W" class="btnOdds add_bet_link match_odds" decimalvalue="2.35" title="Bet on CLUB ATLETICO LANUS" rel="nofollow noopener">2.35</button>
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+3%3a05%3a00+AM&amp;EventParticipantID=344501974&amp;ParticipantName=GIMNASIA+ESGRIMA+COMODORO+RIVADAVIA&amp;EventID=91345641&amp;VenueID=2337239&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Basketball&amp;ImgId=76&amp;EventGroup=Liga+Nacional+de+Basquetbol&amp;EventDescription=Club+Atletico+Lanus+v+Gimnasia+Esgrima+Comodoro+Rivadavia&amp;AllowMultiple=True&amp;Odds=1.55&amp;OddsDisplay=1.55&amp;InRunning=N&amp;InRunningDelay=0" id="344501974-W" class="btnOdds add_bet_link match_odds" decimalvalue="1.55" title="Bet on GIMNASIA ESGRIMA COMODORO RIVADAVIA" rel="nofollow noopener">1.55</button>
+            </div>
+          </div>
+        </div>
+        <div class="sport_fixture">
+          <div class="sport_fixture_title_group">
+            <span class="sport_fixture_title_text">29 Sep 2026 - 20:00</span>
+            <span class="sport_fixture_title_text">Etoile Charleville-Mezieres v Mulhouse Basket Agglomeration</span>
+          </div>
+          <div class="sport_fixture_participant_odds">
+            <div id="Event-91317586" class="participant_match_odds">
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+8%3a00%3a00+PM&amp;EventParticipantID=344416693&amp;ParticipantName=ETOILE+CHARLEVILLE-MEZIERES&amp;EventID=91317586&amp;VenueID=1607325&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Basketball&amp;ImgId=76&amp;EventGroup=French+National+Division+1&amp;EventDescription=Etoile+Charleville-Mezieres+v+Mulhouse+Basket+Agglomeration&amp;AllowMultiple=True&amp;Odds=2.6&amp;OddsDisplay=2.6&amp;InRunning=N&amp;InRunningDelay=0" id="344416693-W" class="btnOdds add_bet_link match_odds" decimalvalue="2.6" title="Bet on ETOILE CHARLEVILLE-MEZIERES" rel="nofollow noopener">2.6</button>
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+8%3a00%3a00+PM&amp;EventParticipantID=344416692&amp;ParticipantName=MULHOUSE+BASKET+AGGLOMERATION&amp;EventID=91317586&amp;VenueID=1607325&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Basketball&amp;ImgId=76&amp;EventGroup=French+National+Division+1&amp;EventDescription=Etoile+Charleville-Mezieres+v+Mulhouse+Basket+Agglomeration&amp;AllowMultiple=True&amp;Odds=1.45&amp;OddsDisplay=1.45&amp;InRunning=N&amp;InRunningDelay=0" id="344416692-W" class="btnOdds add_bet_link match_odds" decimalvalue="1.45" title="Bet on MULHOUSE BASKET AGGLOMERATION" rel="nofollow noopener">1.45</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+"""
+
+
 def test_parse_fixtures_extracts_teams_league_date_and_odds():
     fixtures = InterbetScraper._parse_fixtures(SAMPLE_HTML)
 
@@ -442,16 +498,17 @@ def test_parse_fixtures_skips_a_button_missing_a_required_field():
     assert InterbetScraper._parse_fixtures(html) == []
 
 
-def test_default_sports_config_covers_soccer_rugby_cricket_and_tennis_with_the_real_ids():
+def test_default_sports_config_covers_soccer_rugby_cricket_tennis_and_basketball_with_the_real_ids():
     """Locks in the discovered SportID/SportTypeID/VenueID values (see the
     comments above SPORTS in scraper.py for how each was confirmed against
     the live site) so a future refactor can't silently drop Rugby/Cricket/
-    Tennis or revert any of their VenueIDs to Soccer's (or to each other's --
-    Rugby=53, Cricket=29 and Tennis=6 are all genuinely distinct)."""
+    Tennis/Basketball or revert any of their VenueIDs to Soccer's (or to
+    each other's -- Rugby=53, Cricket=29, Tennis=6 and Basketball=56 are
+    all genuinely distinct)."""
     scraper = InterbetScraper()
 
     by_sport = {cfg.sport: cfg for cfg in scraper.sports}
-    assert set(by_sport) == {"soccer", "rugby", "cricket", "tennis"}
+    assert set(by_sport) == {"soccer", "rugby", "cricket", "tennis", "basketball"}
 
     assert by_sport["soccer"] == SportConfig(
         sport="soccer",
@@ -488,6 +545,16 @@ def test_default_sports_config_covers_soccer_rugby_cricket_and_tennis_with_the_r
         sport_id=55,
         venue_id=6,
         sport_description="Tennis",
+        venue_description="Coming up",
+        country="",
+        cou_id="",
+        order=1,
+    )
+    assert by_sport["basketball"] == SportConfig(
+        sport="basketball",
+        sport_id=76,
+        venue_id=56,
+        sport_description="Basketball",
         venue_description="Coming up",
         country="",
         cou_id="",
@@ -705,6 +772,51 @@ def test_parse_fixtures_skips_a_doubles_fixture_rather_than_mismatching_its_odds
     assert events == []  # incomplete market, correctly never published
 
 
+def test_parse_fixtures_tags_basketball_fixtures_and_extracts_a_two_way_market():
+    """Both fixtures in BASKETBALL_SAMPLE_HTML are real, live-captured
+    Basketball fixtures with a two-way (home/away, no Draw) Match Result
+    market -- proving the parser handles Basketball's own SportType label
+    ("Basketball") the same way it already handles the other sports', and
+    that team names (including the hyphenated "Etoile
+    Charleville-Mezieres") match straightforwardly via `_normalize_name`
+    with no Tennis-style reordering needed."""
+    fixtures = InterbetScraper._parse_fixtures(BASKETBALL_SAMPLE_HTML, sport="basketball")
+
+    assert len(fixtures) == 2
+    assert all(f["sport"] == "basketball" for f in fixtures)
+
+    lanus = next(f for f in fixtures if f["home_team"] == "Club Atletico Lanus")
+    assert lanus["away_team"] == "Gimnasia Esgrima Comodoro Rivadavia"
+    assert lanus["league"] == "Liga Nacional de Basquetbol"
+    assert lanus["home_odds"] == 2.35
+    assert lanus["away_odds"] == 1.55
+    assert lanus["draw_odds"] is None  # basketball always resolves to a winner
+
+    charleville = next(f for f in fixtures if f["home_team"] == "Etoile Charleville-Mezieres")
+    assert charleville["away_team"] == "Mulhouse Basket Agglomeration"
+    assert charleville["league"] == "French National Division 1"
+    assert charleville["home_odds"] == 2.6
+    assert charleville["away_odds"] == 1.45
+    assert charleville["draw_odds"] is None
+
+
+def test_to_odds_events_maps_basketball_fixtures_onto_the_universal_schema():
+    scraper = InterbetScraper()
+    raw = {"fixtures": InterbetScraper._parse_fixtures(BASKETBALL_SAMPLE_HTML, sport="basketball")}
+
+    events = scraper.to_odds_events(raw)
+
+    assert len(events) == 2
+    event = next(e for e in events if e.home_team == "Club Atletico Lanus")
+    assert event.away_team == "Gimnasia Esgrima Comodoro Rivadavia"
+    assert event.sport == "basketball"
+    assert event.league == "Liga Nacional de Basquetbol"
+    assert event.bookmaker == "interbet"
+    assert event.markets["moneyline"].home_odds == 2.35
+    assert event.markets["moneyline"].away_odds == 1.55
+    assert event.markets["moneyline"].draw_odds is None
+
+
 def test_to_odds_events_defaults_untagged_fixtures_to_soccer():
     """A raw fixture dict with no "sport" key at all (the shape every
     pre-Rugby caller/test builds by hand) must still map onto sport
@@ -737,7 +849,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     """fetch_raw_odds must hit LoadCouponsPartial once per sport in
     self.sports (not just Soccer), passing each sport's own VenueID/
     SportID/SportTypeID/VenueDescription/SportDescription/Country/CouID,
-    and combine all four sports' fixtures -- tagged correctly -- into one
+    and combine all five sports' fixtures -- tagged correctly -- into one
     flat list for to_odds_events to consume."""
     scraper = InterbetScraper()
     requested_params = []
@@ -757,14 +869,16 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
             return FakeResponse(RUGBY_SAMPLE_HTML)
         if params["SportDescription"] == "Cricket":
             return FakeResponse(CRICKET_SAMPLE_HTML)
-        return FakeResponse(TENNIS_SAMPLE_HTML)
+        if params["SportDescription"] == "Tennis":
+            return FakeResponse(TENNIS_SAMPLE_HTML)
+        return FakeResponse(BASKETBALL_SAMPLE_HTML)
 
     monkeypatch.setattr(scraper._client, "get", fake_get)
 
     raw = await scraper.fetch_raw_odds()
 
-    assert len(requested_params) == 4
-    soccer_params, rugby_params, cricket_params, tennis_params = requested_params
+    assert len(requested_params) == 5
+    soccer_params, rugby_params, cricket_params, tennis_params, basketball_params = requested_params
     assert soccer_params["SportID"] == 48
     assert soccer_params["VenueID"] == 65
     assert rugby_params["SportID"] == 50
@@ -779,6 +893,10 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     assert tennis_params["VenueID"] == 6
     assert tennis_params["Country"] == ""
     assert tennis_params["CouID"] == ""
+    assert basketball_params["SportID"] == 76
+    assert basketball_params["VenueID"] == 56
+    assert basketball_params["Country"] == ""
+    assert basketball_params["CouID"] == ""
 
     fixtures_by_sport = {}
     for f in raw["fixtures"]:
@@ -787,6 +905,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     assert len(fixtures_by_sport["rugby"]) == 2  # Taranaki v Wellington excluded, no moneyline posted
     assert len(fixtures_by_sport["cricket"]) == 2
     assert len(fixtures_by_sport["tennis"]) == 2
+    assert len(fixtures_by_sport["basketball"]) == 2
 
     events = scraper.to_odds_events(raw)
     events_by_sport = {}
@@ -796,6 +915,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     assert len(events_by_sport["rugby"]) == 2
     assert len(events_by_sport["cricket"]) == 2
     assert len(events_by_sport["tennis"]) == 2
+    assert len(events_by_sport["basketball"]) == 2
 
 
 @pytest.mark.asyncio
