@@ -8,10 +8,11 @@ no stealth browser, and no Cloudflare bypass: verified with a completely
 bare `curl` (no User-Agent, no cookies, no Referer) returning the exact
 same payload as a normal browser session, so none of that is needed
 here, same as Betway ZA and WSB. This adapter polls the same endpoint
-for two sports each cycle -- Soccer and Rugby (South Africa's #2 sport) --
-using different SportID/SportTypeID/VenueID query values for each; both
-were confirmed open with the same bare-curl test, no new auth or
-anti-bot workaround needed for Rugby, it's genuinely the same feed.
+for three sports each cycle -- Soccer, Rugby (South Africa's #2 sport)
+and Cricket -- using different SportID/SportTypeID/VenueID query values
+for each; all three were confirmed open with the same bare-curl test, no
+new auth or anti-bot workaround needed for Rugby or Cricket, it's
+genuinely the same feed.
 
 Unlike Betway ZA and WSB, this endpoint returns a server-rendered HTML
 fragment (an ASP.NET MVC partial view), not JSON -- the site has no JSON
@@ -28,14 +29,15 @@ odds button embeds its EventID/ParticipantName/Odds/EventDate/EventGroup
 as a query string in its `data-url` attribute (the URL the page's own JS
 would POST to place a bet), so parsing means reading those attributes,
 not scraping prose -- no more fragile than reading JSON keys. This is
-true for both Soccer and Rugby -- same markup, same query-string shape,
-just a different SportType label and Market name ("Match Odds" vs
-"Match Result") inside it, neither of which this parser even reads.
+true for Soccer, Rugby and Cricket alike -- same markup, same
+query-string shape, just a different SportType label and Market name
+("Match Odds" vs "Match Result") inside it, neither of which this parser
+even reads.
 
 Endpoint discovered by ordinary browsing (curl against the pages
-interbet.co.za/Prematch/Sport/Soccer/* and interbet.co.za/Prematch/Sport/
-Rugby/* themselves link to) and inspecting the `data-url` the page's own
-sport.js issues via `$.ajax` GET.
+interbet.co.za/Prematch/Sport/Soccer/*, .../Prematch/Sport/Rugby/* and
+.../Prematch/Sport/Cricket/* themselves link to) and inspecting the
+`data-url` the page's own sport.js issues via `$.ajax` GET.
 """
 
 import asyncio
@@ -60,9 +62,9 @@ class SportConfig(NamedTuple):
     onto OddsEvent.sport, plus everything LoadCouponsPartial needs on its
     query string to return that sport's single broadest coupon in one
     call. See the SPORTS tuple below for how each field was chosen per
-    sport -- Soccer and Rugby don't share the same VenueID or even the
-    same notion of "broadest", so this is deliberately not one shared
-    constant with a swapped-in SportID.
+    sport -- Soccer, Rugby and Cricket don't share the same VenueID or
+    even the same notion of "broadest", so this is deliberately not one
+    shared constant with a swapped-in SportID.
     """
 
     sport: str
@@ -103,10 +105,25 @@ ALL_LEAGUES_24H_VENUE_ID = 65
 RUGBY_SPORT_ID = 50
 RUGBY_COMING_UP_VENUE_ID = 53
 
+# SportID=59 is Interbet's sport-level id for Cricket -- discovered the
+# same way as Soccer and Rugby: rendering /Prematch/Sport/Cricket and
+# reading the SportID/SportTypeID its default coupons-container data-url
+# embeds. VenueID=29 ("Coming up") is the venue to use, for the same
+# reason as Rugby's VenueID=53: Cricket's nav bar on
+# /Prematch/Sport/Cricket renders exactly one tab -- "Coming up" -- same
+# as Rugby, no separate "All Leagues 24H" to choose instead, and no
+# other venue exists to compare it against. Confirmed populated with a
+# live fetch: 14 fixtures across 8 competitions (CSA T20 Challenge,
+# Test International Friendlies, LG ICC ODI Championship, Asia Games,
+# and others), spanning international, women's and domestic South
+# African cricket, not clipped to a narrow window.
+CRICKET_SPORT_ID = 59
+CRICKET_COMING_UP_VENUE_ID = 29
+
 # The exact query values captured from each sport's own default
-# coupons-container data-url (see comments above) -- Rugby's Country and
-# CouID are genuinely empty strings there, not a placeholder, unlike
-# Soccer's "International"/"INT".
+# coupons-container data-url (see comments above) -- Rugby's and
+# Cricket's Country and CouID are genuinely empty strings there, not a
+# placeholder, unlike Soccer's "International"/"INT".
 SPORTS: tuple[SportConfig, ...] = (
     SportConfig(
         sport="soccer",
@@ -123,6 +140,16 @@ SPORTS: tuple[SportConfig, ...] = (
         sport_id=RUGBY_SPORT_ID,
         venue_id=RUGBY_COMING_UP_VENUE_ID,
         sport_description="Rugby",
+        venue_description="Coming up",
+        country="",
+        cou_id="",
+        order=1,
+    ),
+    SportConfig(
+        sport="cricket",
+        sport_id=CRICKET_SPORT_ID,
+        venue_id=CRICKET_COMING_UP_VENUE_ID,
+        sport_description="Cricket",
         venue_description="Coming up",
         country="",
         cou_id="",
@@ -154,11 +181,12 @@ def _normalize_name(name: str) -> str:
     be matched back to the right side (home/away/draw) at all; without
     it, ~9% of live fixtures silently lost one or more outcomes.
 
-    Reused as-is for Rugby fixtures -- nothing about it is soccer-specific,
-    and Interbet renders Rugby's EventDescription/ParticipantName pairs
-    with the exact same casing/hyphenation inconsistency (provincial and
-    union names are just as likely to carry a hyphen as a country name
-    is), so the same collapsing is needed there too."""
+    Reused as-is for Rugby and Cricket fixtures -- nothing about it is
+    soccer-specific, and Interbet renders their EventDescription/
+    ParticipantName pairs with the exact same casing/hyphenation
+    inconsistency (provincial/union names and, for Cricket, hyphenated
+    or multi-word team names are just as likely to trip this up as a
+    country name is), so the same collapsing is needed there too."""
     return " ".join(name.replace("-", " ").split()).lower()
 
 
@@ -171,19 +199,19 @@ class InterbetScraper(BaseScraper):
 
     async def fetch_raw_odds(self) -> dict:
         """GETs the HTML coupons partial for every sport in self.sports
-        (Soccer and Rugby by default) and extracts each fixture's
-        structured fields from its odds buttons' `data-url` query
-        strings, returning one combined dict of already-flattened
+        (Soccer, Rugby and Cricket by default) and extracts each
+        fixture's structured fields from its odds buttons' `data-url`
+        query strings, returning one combined dict of already-flattened
         fixture records, each tagged with which sport it came from.
         Domain mapping onto OddsEvent happens separately in
         to_odds_events, same split as Betway ZA/WSB.
 
-        The two sports are fetched sequentially and treated as one
-        atomic unit for this cycle, same as when this method fetched a
-        single URL: a transient failure fetching either one raises
-        (raise_for_status/httpx's own connection errors) and aborts the
-        whole cycle rather than trying to salvage a partial soccer-only
-        or rugby-only batch -- poll() below already logs that and
+        The configured sports are fetched sequentially and treated as
+        one atomic unit for this cycle, same as when this method fetched
+        a single URL: a transient failure fetching any one of them
+        raises (raise_for_status/httpx's own connection errors) and
+        aborts the whole cycle rather than trying to salvage a partial
+        batch missing one sport -- poll() below already logs that and
         retries cleanly next cycle, so there's no need for separate
         per-sport failure handling here.
         """
@@ -213,10 +241,10 @@ class InterbetScraper(BaseScraper):
         (keyed by EventID), each holding whatever home/away/draw odds
         were found on its "Match Odds"/"Match Result" (1X2) buttons, and
         tagged with `sport` (the value fetch_raw_odds calls this with --
-        "soccer" or "rugby" -- defaulted here to "soccer" so every
-        existing call site and test that predates Rugby support, which
-        only ever passed one positional `html` argument, keeps working
-        unchanged).
+        "soccer", "rugby" or "cricket" -- defaulted here to "soccer" so
+        every existing call site and test that predates Rugby/Cricket
+        support, which only ever passed one positional `html` argument,
+        keeps working unchanged).
 
         Scoped to `div.participant_match_odds` specifically -- Interbet
         renders handicap and double-chance odds for the same fixture in
@@ -231,7 +259,10 @@ class InterbetScraper(BaseScraper):
         those naturally produce zero buttons for this selector to find,
         so no fixture entry is created for them at all, same as a
         fixture BeautifulSoup finds no buttons for today would already be
-        skipped.
+        skipped. Cricket's live "Coming up" coupon currently has no
+        handicap blocks at all, but the same div-class scoping still
+        applies -- it's what protects this parser if/when Interbet adds
+        one, not something specific to Rugby's current markup.
 
         Rugby's market shape also genuinely varies fixture to fixture --
         some competitions post a Draw price (three-way, same as Soccer's
@@ -239,7 +270,19 @@ class InterbetScraper(BaseScraper):
         method assumes a Draw exists (draw_odds simply stays at its
         None default when there's no "DRAW" participant button), so
         both shapes come through faithfully without forcing a two-way
-        Rugby market into a three-way struct or vice versa.
+        Rugby market into a three-way struct or vice versa. Cricket's
+        "Match Result" market is genuinely two-way in every fixture seen
+        live so far -- 14 fixtures checked across 8 competitions,
+        including ones labelled "Test International Friendlies" (e.g.
+        India A v Australia A), all posted exactly 2 buttons and no DRAW
+        participant, unlike a traditional Test match's win/lose/draw
+        result. Interbet may simply not be offering a draw price for
+        Cricket at all right now (or these specific "Test"-labelled
+        fixtures may not be genuine 5-day Tests), but nothing here
+        assumes either way -- the same Draw-optional handling used for
+        Rugby applies unchanged, so a three-way Cricket fixture (if
+        Interbet ever posts one) would come through with draw_odds set,
+        not get coerced into a two-way struct.
 
         Defensive per-fixture and per-button: a single malformed card
         must not lose every other fixture in the same snapshot.
@@ -302,8 +345,9 @@ class InterbetScraper(BaseScraper):
         Result / 1X2) market only for now, matching Betway ZA and WSB's
         scope. `draw_odds` is left None on MarketOdds for a fixture whose
         market never had a Draw price (a real, valid shape for some Rugby
-        competitions, not a missing-data bug) -- MarketOdds already
-        models it as optional for exactly this reason.
+        competitions, and for every Cricket fixture observed live so far
+        -- not a missing-data bug) -- MarketOdds already models it as
+        optional for exactly this reason.
 
         `fixture.get("sport", "soccer")` rather than a bare "soccer"
         literal: raw fixture dicts built by _parse_fixtures are tagged

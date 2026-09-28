@@ -128,6 +128,79 @@ RUGBY_SAMPLE_HTML = """
 </div>
 """
 
+# Real HTML captured from a live, plain GET to Interbet's public
+# FixedOdds/LoadCouponsPartial with SportID=59/SportTypeID=59 (Cricket)
+# and VenueID=29 ("Coming up" -- Cricket's only coupon venue, same
+# single-tab situation as Rugby's; see scraper.py's
+# CRICKET_COMING_UP_VENUE_ID comment), trimmed of unrelated markup the
+# same way SAMPLE_HTML/RUGBY_SAMPLE_HTML are. Both fixtures are real,
+# unmodified field values:
+#   - India A v Australia A is from the "Test International Friendlies"
+#     competition (VenueDescription in the live page), yet still posts
+#     only a two-way (home/away) Match Result market with no DRAW
+#     participant button -- proving the market shape genuinely observed
+#     live for Cricket, even for a "Test"-labelled fixture, is two-way,
+#     not the three-way (win/lose/draw) shape a genuine 5-day Test match
+#     could in principle carry.
+#   - Boland Cricket v Knights (CSA T20 Challenge, a limited-overs
+#     competition) is also two-way, for comparison.
+# Neither the live "Coming up" coupon nor any other fixture checked at
+# capture time had a participant_handicap_odds sibling block for
+# Cricket at all (unlike Soccer/Rugby), but the parser's div-class
+# scoping doesn't depend on one being present or absent.
+CRICKET_SAMPLE_HTML = """
+<div class="sport">
+  <div class="sports_card">
+    <div class="sports_card_body">
+      <div class="sports_card_body_fixtures">
+        <div class="sport_fixture">
+          <div class="sport_fixture_title_group">
+            <span class="sport_fixture_title_text">29 Sep 2026 - 06:00</span>
+            <span class="sport_fixture_title_text">India A v Australia A</span>
+          </div>
+          <div class="sport_fixture_participant_odds">
+            <div id="Event-91351326" class="participant_match_odds">
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+6%3a00%3a00+AM&amp;EventParticipantID=344519977&amp;ParticipantName=AUSTRALIA+A&amp;EventID=91351326&amp;VenueID=6212281&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Cricket&amp;ImgId=59&amp;EventGroup=Test+International+Friendlies&amp;EventDescription=India+A+v+Australia+A&amp;AllowMultiple=True&amp;Odds=2.85&amp;OddsDisplay=2.85&amp;InRunning=N&amp;InRunningDelay=0" id="344519977-W" class="btnOdds add_bet_link match_odds" decimalvalue="2.85" title="Bet on AUSTRALIA A" rel="nofollow noopener">2.85</button>
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+6%3a00%3a00+AM&amp;EventParticipantID=344519978&amp;ParticipantName=INDIA+A&amp;EventID=91351326&amp;VenueID=6212281&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Cricket&amp;ImgId=59&amp;EventGroup=Test+International+Friendlies&amp;EventDescription=India+A+v+Australia+A&amp;AllowMultiple=True&amp;Odds=1.45&amp;OddsDisplay=1.45&amp;InRunning=N&amp;InRunningDelay=0" id="344519978-W" class="btnOdds add_bet_link match_odds" decimalvalue="1.45" title="Bet on INDIA A" rel="nofollow noopener">1.45</button>
+            </div>
+          </div>
+        </div>
+        <div class="sport_fixture">
+          <div class="sport_fixture_title_group">
+            <span class="sport_fixture_title_text">29 Sep 2026 - 18:00</span>
+            <span class="sport_fixture_title_text">Boland Cricket v Knights</span>
+          </div>
+          <div class="sport_fixture_participant_odds">
+            <div id="Event-91354282" class="participant_match_odds">
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+6%3a00%3a00+PM&amp;EventParticipantID=344529694&amp;ParticipantName=BOLAND+CRICKET&amp;EventID=91354282&amp;VenueID=3682765&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Cricket&amp;ImgId=59&amp;EventGroup=CSA+T20+Challenge&amp;EventDescription=Boland+Cricket+v+Knights&amp;AllowMultiple=True&amp;Odds=1.65&amp;OddsDisplay=1.65&amp;InRunning=N&amp;InRunningDelay=0" id="344529694-W" class="btnOdds add_bet_link match_odds" decimalvalue="1.65" title="Bet on BOLAND CRICKET" rel="nofollow noopener">1.65</button>
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+6%3a00%3a00+PM&amp;EventParticipantID=344529693&amp;ParticipantName=KNIGHTS&amp;EventID=91354282&amp;VenueID=3682765&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Cricket&amp;ImgId=59&amp;EventGroup=CSA+T20+Challenge&amp;EventDescription=Boland+Cricket+v+Knights&amp;AllowMultiple=True&amp;Odds=2.25&amp;OddsDisplay=2.25&amp;InRunning=N&amp;InRunningDelay=0" id="344529693-W" class="btnOdds add_bet_link match_odds" decimalvalue="2.25" title="Bet on KNIGHTS" rel="nofollow noopener">2.25</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+"""
+
+# Hand-built (not a live capture) -- exercises the three-way (win/lose/
+# draw) shape a genuine multi-day Test match's Match Result market could
+# carry, the same way RUGBY_SAMPLE_HTML's Otago v Auckland exercises it
+# for Rugby. Every live Cricket fixture checked while writing this
+# adapter (see CRICKET_SAMPLE_HTML above) was two-way, including ones
+# labelled "Test International Friendlies", so this shape wasn't
+# observed live -- but the parser makes no assumption either way (see
+# scraper.py's _parse_fixtures docstring), so this fixture proves a
+# DRAW button, if Interbet ever posts one for Cricket, comes through
+# correctly rather than being silently dropped or mismatched.
+CRICKET_THREE_WAY_HTML = """
+<div id="Event-90000002" class="participant_match_odds">
+  <button type="button" data-url="/FixedOdds/AddBet?EventDate=10%2f15%2f2026+8%3a00%3a00+AM&amp;EventParticipantID=1&amp;ParticipantName=ENGLAND&amp;EventID=90000002&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Cricket&amp;ImgId=59&amp;EventGroup=The+Ashes&amp;EventDescription=England+v+Australia&amp;AllowMultiple=True&amp;Odds=2.5&amp;OddsDisplay=2.5&amp;InRunning=N&amp;InRunningDelay=0" class="btnOdds add_bet_link match_odds" title="Bet on ENGLAND" rel="nofollow noopener">2.5</button>
+  <button type="button" data-url="/FixedOdds/AddBet?EventDate=10%2f15%2f2026+8%3a00%3a00+AM&amp;EventParticipantID=2&amp;ParticipantName=AUSTRALIA&amp;EventID=90000002&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Cricket&amp;ImgId=59&amp;EventGroup=The+Ashes&amp;EventDescription=England+v+Australia&amp;AllowMultiple=True&amp;Odds=2.1&amp;OddsDisplay=2.1&amp;InRunning=N&amp;InRunningDelay=0" class="btnOdds add_bet_link match_odds" title="Bet on AUSTRALIA" rel="nofollow noopener">2.1</button>
+  <button type="button" data-url="/FixedOdds/AddBet?EventDate=10%2f15%2f2026+8%3a00%3a00+AM&amp;EventParticipantID=3&amp;ParticipantName=DRAW&amp;EventID=90000002&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Cricket&amp;ImgId=59&amp;EventGroup=The+Ashes&amp;EventDescription=England+v+Australia&amp;AllowMultiple=True&amp;Odds=4.5&amp;OddsDisplay=4.5&amp;InRunning=N&amp;InRunningDelay=0" class="btnOdds add_bet_link match_odds" title="Bet on DRAW" rel="nofollow noopener">4.5</button>
+</div>
+"""
+
 # Hand-built (not a live capture) following the same real markup shape as
 # RUGBY_SAMPLE_HTML, for a two-way Rugby market (no Draw participant at
 # all) -- the live "Coming up" coupon only had one competition running
@@ -269,15 +342,15 @@ def test_parse_fixtures_skips_a_button_missing_a_required_field():
     assert InterbetScraper._parse_fixtures(html) == []
 
 
-def test_default_sports_config_covers_soccer_and_rugby_with_the_real_ids():
+def test_default_sports_config_covers_soccer_rugby_and_cricket_with_the_real_ids():
     """Locks in the discovered SportID/SportTypeID/VenueID values (see the
     comments above SPORTS in scraper.py for how each was confirmed against
-    the live site) so a future refactor can't silently drop Rugby or
-    revert its VenueID to Soccer's."""
+    the live site) so a future refactor can't silently drop Rugby/Cricket or
+    revert either one's VenueID to Soccer's."""
     scraper = InterbetScraper()
 
     by_sport = {cfg.sport: cfg for cfg in scraper.sports}
-    assert set(by_sport) == {"soccer", "rugby"}
+    assert set(by_sport) == {"soccer", "rugby", "cricket"}
 
     assert by_sport["soccer"] == SportConfig(
         sport="soccer",
@@ -294,6 +367,16 @@ def test_default_sports_config_covers_soccer_and_rugby_with_the_real_ids():
         sport_id=50,
         venue_id=53,
         sport_description="Rugby",
+        venue_description="Coming up",
+        country="",
+        cou_id="",
+        order=1,
+    )
+    assert by_sport["cricket"] == SportConfig(
+        sport="cricket",
+        sport_id=59,
+        venue_id=29,
+        sport_description="Cricket",
         venue_description="Coming up",
         country="",
         cou_id="",
@@ -367,6 +450,69 @@ def test_to_odds_events_maps_a_two_way_rugby_fixture_with_no_draw_odds_field_set
     assert event.markets["moneyline"].draw_odds is None
 
 
+def test_parse_fixtures_tags_cricket_fixtures_with_sport_and_extracts_a_two_way_market():
+    """India A v Australia A and Boland Cricket v Knights are both real,
+    live-captured Cricket fixtures with a two-way (home/away, no Draw)
+    Match Result market -- including India A v Australia A, which comes
+    from the "Test International Friendlies" competition. Proves the
+    parser handles Cricket's own SportType/Market labels ("Cricket" /
+    "Match Result") the same way it already handles Soccer's and
+    Rugby's."""
+    fixtures = InterbetScraper._parse_fixtures(CRICKET_SAMPLE_HTML, sport="cricket")
+
+    assert len(fixtures) == 2
+    assert all(f["sport"] == "cricket" for f in fixtures)
+
+    india = next(f for f in fixtures if f["home_team"] == "India A")
+    assert india["away_team"] == "Australia A"
+    assert india["league"] == "Test International Friendlies"
+    assert india["home_odds"] == 1.45
+    assert india["away_odds"] == 2.85
+    assert india["draw_odds"] is None  # no DRAW button posted for this fixture
+
+    boland = next(f for f in fixtures if f["home_team"] == "Boland Cricket")
+    assert boland["away_team"] == "Knights"
+    assert boland["league"] == "CSA T20 Challenge"
+    assert boland["home_odds"] == 1.65
+    assert boland["away_odds"] == 2.25
+    assert boland["draw_odds"] is None
+
+
+def test_parse_fixtures_handles_a_three_way_cricket_market_with_a_draw_option():
+    """No live Cricket fixture observed while building this adapter posted
+    a Draw price (see CRICKET_SAMPLE_HTML's docstring) -- but the parser
+    doesn't assume that shape, so a hand-built three-way (win/lose/draw)
+    Cricket fixture, the shape a genuine multi-day Test match could in
+    principle carry, must still parse with draw_odds populated rather
+    than being coerced into a two-way struct."""
+    fixtures = InterbetScraper._parse_fixtures(CRICKET_THREE_WAY_HTML, sport="cricket")
+
+    assert len(fixtures) == 1
+    fixture = fixtures[0]
+    assert fixture["home_team"] == "England"
+    assert fixture["away_team"] == "Australia"
+    assert fixture["home_odds"] == 2.5
+    assert fixture["away_odds"] == 2.1
+    assert fixture["draw_odds"] == 4.5
+
+
+def test_to_odds_events_maps_cricket_fixtures_onto_the_universal_schema():
+    scraper = InterbetScraper()
+    raw = {"fixtures": InterbetScraper._parse_fixtures(CRICKET_SAMPLE_HTML, sport="cricket")}
+
+    events = scraper.to_odds_events(raw)
+
+    assert len(events) == 2
+    event = next(e for e in events if e.home_team == "India A")
+    assert event.away_team == "Australia A"
+    assert event.sport == "cricket"
+    assert event.league == "Test International Friendlies"
+    assert event.bookmaker == "interbet"
+    assert event.markets["moneyline"].home_odds == 1.45
+    assert event.markets["moneyline"].away_odds == 2.85
+    assert event.markets["moneyline"].draw_odds is None
+
+
 def test_to_odds_events_defaults_untagged_fixtures_to_soccer():
     """A raw fixture dict with no "sport" key at all (the shape every
     pre-Rugby caller/test builds by hand) must still map onto sport
@@ -399,7 +545,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     """fetch_raw_odds must hit LoadCouponsPartial once per sport in
     self.sports (not just Soccer), passing each sport's own VenueID/
     SportID/SportTypeID/VenueDescription/SportDescription/Country/CouID,
-    and combine both sports' fixtures -- tagged correctly -- into one
+    and combine all three sports' fixtures -- tagged correctly -- into one
     flat list for to_odds_events to consume."""
     scraper = InterbetScraper()
     requested_params = []
@@ -415,26 +561,33 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
         requested_params.append(params)
         if params["SportDescription"] == "Soccer":
             return FakeResponse(SAMPLE_HTML)
-        return FakeResponse(RUGBY_SAMPLE_HTML)
+        if params["SportDescription"] == "Rugby":
+            return FakeResponse(RUGBY_SAMPLE_HTML)
+        return FakeResponse(CRICKET_SAMPLE_HTML)
 
     monkeypatch.setattr(scraper._client, "get", fake_get)
 
     raw = await scraper.fetch_raw_odds()
 
-    assert len(requested_params) == 2
-    soccer_params, rugby_params = requested_params
+    assert len(requested_params) == 3
+    soccer_params, rugby_params, cricket_params = requested_params
     assert soccer_params["SportID"] == 48
     assert soccer_params["VenueID"] == 65
     assert rugby_params["SportID"] == 50
     assert rugby_params["VenueID"] == 53
     assert rugby_params["Country"] == ""
     assert rugby_params["CouID"] == ""
+    assert cricket_params["SportID"] == 59
+    assert cricket_params["VenueID"] == 29
+    assert cricket_params["Country"] == ""
+    assert cricket_params["CouID"] == ""
 
     fixtures_by_sport = {}
     for f in raw["fixtures"]:
         fixtures_by_sport.setdefault(f["sport"], []).append(f)
     assert len(fixtures_by_sport["soccer"]) == 2
     assert len(fixtures_by_sport["rugby"]) == 2  # Taranaki v Wellington excluded, no moneyline posted
+    assert len(fixtures_by_sport["cricket"]) == 2
 
     events = scraper.to_odds_events(raw)
     events_by_sport = {}
@@ -442,6 +595,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
         events_by_sport.setdefault(e.sport, []).append(e)
     assert len(events_by_sport["soccer"]) == 2
     assert len(events_by_sport["rugby"]) == 2
+    assert len(events_by_sport["cricket"]) == 2
 
 
 @pytest.mark.asyncio
