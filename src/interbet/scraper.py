@@ -6,8 +6,12 @@ plain jQuery `$.ajax` GET, see `Scripts/sport.js`) to fill in the fixture
 list for any visitor. This is a plain HTTP GET with no TLS impersonation,
 no stealth browser, and no Cloudflare bypass: verified with a completely
 bare `curl` (no User-Agent, no cookies, no Referer) returning the exact
-same ~1.3MB payload as a normal browser session, so none of that is
-needed here, same as Betway ZA and WSB.
+same payload as a normal browser session, so none of that is needed
+here, same as Betway ZA and WSB. This adapter polls the same endpoint
+for two sports each cycle -- Soccer and Rugby (South Africa's #2 sport) --
+using different SportID/SportTypeID/VenueID query values for each; both
+were confirmed open with the same bare-curl test, no new auth or
+anti-bot workaround needed for Rugby, it's genuinely the same feed.
 
 Unlike Betway ZA and WSB, this endpoint returns a server-rendered HTML
 fragment (an ASP.NET MVC partial view), not JSON -- the site has no JSON
@@ -23,17 +27,22 @@ The data is nonetheless fully structured despite the HTML wrapper: every
 odds button embeds its EventID/ParticipantName/Odds/EventDate/EventGroup
 as a query string in its `data-url` attribute (the URL the page's own JS
 would POST to place a bet), so parsing means reading those attributes,
-not scraping prose -- no more fragile than reading JSON keys.
+not scraping prose -- no more fragile than reading JSON keys. This is
+true for both Soccer and Rugby -- same markup, same query-string shape,
+just a different SportType label and Market name ("Match Odds" vs
+"Match Result") inside it, neither of which this parser even reads.
 
 Endpoint discovered by ordinary browsing (curl against the pages
-interbet.co.za/Prematch/Sport/Soccer/* itself links to) and inspecting
-the `data-url` the page's own sport.js issues via `$.ajax` GET.
+interbet.co.za/Prematch/Sport/Soccer/* and interbet.co.za/Prematch/Sport/
+Rugby/* themselves link to) and inspecting the `data-url` the page's own
+sport.js issues via `$.ajax` GET.
 """
 
 import asyncio
 import logging
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta, timezone
+from typing import NamedTuple
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -45,6 +54,27 @@ logger = logging.getLogger(__name__)
 
 INTERBET_COUPONS_URL = "https://interbet.co.za/FixedOdds/LoadCouponsPartial"
 
+
+class SportConfig(NamedTuple):
+    """One sport this adapter polls each cycle: the `sport` value it maps
+    onto OddsEvent.sport, plus everything LoadCouponsPartial needs on its
+    query string to return that sport's single broadest coupon in one
+    call. See the SPORTS tuple below for how each field was chosen per
+    sport -- Soccer and Rugby don't share the same VenueID or even the
+    same notion of "broadest", so this is deliberately not one shared
+    constant with a swapped-in SportID.
+    """
+
+    sport: str
+    sport_id: int
+    venue_id: int
+    sport_description: str
+    venue_description: str
+    country: str
+    cou_id: str
+    order: int
+
+
 # SportID=48 is Interbet's sport-level id for Soccer. VenueID=65 ("All
 # Leagues 24H") is the broadest single-call coupon: every soccer fixture
 # (any competition) kicking off in the next 24 hours, in one response --
@@ -53,6 +83,52 @@ INTERBET_COUPONS_URL = "https://interbet.co.za/FixedOdds/LoadCouponsPartial"
 # narrower, or the various single-competition venues).
 SOCCER_SPORT_ID = 48
 ALL_LEAGUES_24H_VENUE_ID = 65
+
+# SportID=50 is Interbet's sport-level id for Rugby -- discovered the same
+# way as Soccer's SportID=48: rendering /Prematch/Sport/Rugby and reading
+# the SportID/SportTypeID Interbet's own default coupons-container
+# data-url embeds. VenueID=53 ("Coming up") is the venue to use, but for
+# a different reason than Soccer's VenueID=65: Soccer's nav bar on
+# /Prematch/Sport/Soccer has a dozen-plus tabs (Starting in 4 hours / UEFA
+# Nations League / ... / All Leagues 24H / Europe / ...), and "All Leagues
+# 24H" is deliberately the broadest of those. Rugby's nav bar on
+# /Prematch/Sport/Rugby renders exactly one tab -- "Coming up" -- full
+# stop; there is no separate "All Leagues 24H" (or any other) venue to
+# choose instead for Rugby, and VenueID=65/SportID=50 (guessing Soccer's
+# venue would carry over) returns a genuinely empty coupon. VenueID=53 is
+# simultaneously the broadest and the only coupon Interbet exposes for
+# this sport -- confirmed by fetching it and finding fixtures spanning
+# several days out, not clipped to a 24h window the way Soccer's other,
+# narrower venues are.
+RUGBY_SPORT_ID = 50
+RUGBY_COMING_UP_VENUE_ID = 53
+
+# The exact query values captured from each sport's own default
+# coupons-container data-url (see comments above) -- Rugby's Country and
+# CouID are genuinely empty strings there, not a placeholder, unlike
+# Soccer's "International"/"INT".
+SPORTS: tuple[SportConfig, ...] = (
+    SportConfig(
+        sport="soccer",
+        sport_id=SOCCER_SPORT_ID,
+        venue_id=ALL_LEAGUES_24H_VENUE_ID,
+        sport_description="Soccer",
+        venue_description="All Leagues 24H",
+        country="International",
+        cou_id="INT",
+        order=5,
+    ),
+    SportConfig(
+        sport="rugby",
+        sport_id=RUGBY_SPORT_ID,
+        venue_id=RUGBY_COMING_UP_VENUE_ID,
+        sport_description="Rugby",
+        venue_description="Coming up",
+        country="",
+        cou_id="",
+        order=1,
+    ),
+)
 
 # Plain, fixed-interval polling -- same cadence as a normal page refresh,
 # not randomized or disguised to look human, same as Betway ZA and WSB.
@@ -76,58 +152,97 @@ def _normalize_name(name: str) -> str:
     hyphens become spaces (and case differs) in one but not the other.
     Collapsing both to the same normal form is what lets a button's odds
     be matched back to the right side (home/away/draw) at all; without
-    it, ~9% of live fixtures silently lost one or more outcomes."""
+    it, ~9% of live fixtures silently lost one or more outcomes.
+
+    Reused as-is for Rugby fixtures -- nothing about it is soccer-specific,
+    and Interbet renders Rugby's EventDescription/ParticipantName pairs
+    with the exact same casing/hyphenation inconsistency (provincial and
+    union names are just as likely to carry a hyphen as a country name
+    is), so the same collapsing is needed there too."""
     return " ".join(name.replace("-", " ").split()).lower()
 
 
 class InterbetScraper(BaseScraper):
     bookmaker_id = "interbet"
 
-    def __init__(self, venue_id: int = ALL_LEAGUES_24H_VENUE_ID, sport_id: int = SOCCER_SPORT_ID):
-        self.venue_id = venue_id
-        self.sport_id = sport_id
+    def __init__(self, sports: tuple[SportConfig, ...] = SPORTS):
+        self.sports = sports
         self._client = httpx.AsyncClient(timeout=15)
 
     async def fetch_raw_odds(self) -> dict:
-        """GETs the HTML coupons partial and extracts each fixture's
+        """GETs the HTML coupons partial for every sport in self.sports
+        (Soccer and Rugby by default) and extracts each fixture's
         structured fields from its odds buttons' `data-url` query
-        strings, returning a dict of already-flattened fixture records.
+        strings, returning one combined dict of already-flattened
+        fixture records, each tagged with which sport it came from.
         Domain mapping onto OddsEvent happens separately in
         to_odds_events, same split as Betway ZA/WSB.
+
+        The two sports are fetched sequentially and treated as one
+        atomic unit for this cycle, same as when this method fetched a
+        single URL: a transient failure fetching either one raises
+        (raise_for_status/httpx's own connection errors) and aborts the
+        whole cycle rather than trying to salvage a partial soccer-only
+        or rugby-only batch -- poll() below already logs that and
+        retries cleanly next cycle, so there's no need for separate
+        per-sport failure handling here.
         """
-        response = await self._client.get(
-            INTERBET_COUPONS_URL,
-            params={
-                "VenueID": self.venue_id,
-                "SportID": self.sport_id,
-                "VenueDescription": "All Leagues 24H",
-                "SportDescription": "Soccer",
-                "Country": "International",
-                "CouID": "INT",
-                "EventGroup": "",
-                "SportTypeID": self.sport_id,
-                "Order": 5,
-            },
-        )
-        response.raise_for_status()
-        return {"fixtures": self._parse_fixtures(response.text)}
+        fixtures: list[dict] = []
+        for cfg in self.sports:
+            response = await self._client.get(
+                INTERBET_COUPONS_URL,
+                params={
+                    "VenueID": cfg.venue_id,
+                    "SportID": cfg.sport_id,
+                    "VenueDescription": cfg.venue_description,
+                    "SportDescription": cfg.sport_description,
+                    "Country": cfg.country,
+                    "CouID": cfg.cou_id,
+                    "EventGroup": "",
+                    "SportTypeID": cfg.sport_id,
+                    "Order": cfg.order,
+                },
+            )
+            response.raise_for_status()
+            fixtures.extend(self._parse_fixtures(response.text, sport=cfg.sport))
+        return {"fixtures": fixtures}
 
     @staticmethod
-    def _parse_fixtures(html: str) -> list[dict]:
-        """Parses the coupons partial into one dict per fixture (keyed by
-        EventID), each holding whatever home/away/draw odds were found on
-        its "Match Odds" (1X2) buttons.
+    def _parse_fixtures(html: str, sport: str = "soccer") -> list[dict]:
+        """Parses one sport's coupons partial into one dict per fixture
+        (keyed by EventID), each holding whatever home/away/draw odds
+        were found on its "Match Odds"/"Match Result" (1X2) buttons, and
+        tagged with `sport` (the value fetch_raw_odds calls this with --
+        "soccer" or "rugby" -- defaulted here to "soccer" so every
+        existing call site and test that predates Rugby support, which
+        only ever passed one positional `html` argument, keeps working
+        unchanged).
 
         Scoped to `div.participant_match_odds` specifically -- Interbet
         renders handicap and double-chance odds for the same fixture in
         sibling `div.participant_handicap_odds` blocks right next to it,
         and (misleadingly) those buttons' own query strings also carry
         `BetType=Win`, so the div class, not any query param, is what
-        actually distinguishes the 1X2 market from the others.
+        actually distinguishes the 1X2 market from the others. This is
+        true for Rugby too -- its handicap buttons carry BetType=Win and
+        Market=Handicap right alongside Match Result buttons the same
+        way, and some Rugby fixtures currently have an empty (button-less)
+        `participant_match_odds` div with only a handicap price posted --
+        those naturally produce zero buttons for this selector to find,
+        so no fixture entry is created for them at all, same as a
+        fixture BeautifulSoup finds no buttons for today would already be
+        skipped.
+
+        Rugby's market shape also genuinely varies fixture to fixture --
+        some competitions post a Draw price (three-way, same as Soccer's
+        1X2) and some don't (two-way, ordinary win/loss); nothing in this
+        method assumes a Draw exists (draw_odds simply stays at its
+        None default when there's no "DRAW" participant button), so
+        both shapes come through faithfully without forcing a two-way
+        Rugby market into a three-way struct or vice versa.
 
         Defensive per-fixture and per-button: a single malformed card
-        must not lose every other fixture in the same ~100-event
-        snapshot.
+        must not lose every other fixture in the same snapshot.
         """
         soup = BeautifulSoup(html, "html.parser")
         fixtures: dict[str, dict] = {}
@@ -158,6 +273,7 @@ class InterbetScraper(BaseScraper):
                 event_id,
                 {
                     "event_id": event_id,
+                    "sport": sport,
                     "league": event_group,
                     "home_team": home_name,
                     "away_team": away_name,
@@ -182,8 +298,19 @@ class InterbetScraper(BaseScraper):
 
     def to_odds_events(self, raw: dict) -> list[OddsEvent]:
         """Maps the already-flattened fixture dicts from fetch_raw_odds
-        onto the universal OddsEvent schema. Moneyline (Match Odds/1X2)
-        market only for now, matching Betway ZA and WSB's scope.
+        onto the universal OddsEvent schema. Moneyline (Match Odds/Match
+        Result / 1X2) market only for now, matching Betway ZA and WSB's
+        scope. `draw_odds` is left None on MarketOdds for a fixture whose
+        market never had a Draw price (a real, valid shape for some Rugby
+        competitions, not a missing-data bug) -- MarketOdds already
+        models it as optional for exactly this reason.
+
+        `fixture.get("sport", "soccer")` rather than a bare "soccer"
+        literal: raw fixture dicts built by _parse_fixtures are tagged
+        with their sport (see that method), but this defaults to
+        "soccer" for any raw dict that predates that tagging -- keeping
+        this method's behavior unchanged for every existing caller/test
+        that hand-builds a fixture dict without a "sport" key.
 
         Note event_id (the OddsEvent field) is left unset here -- that's
         the engine's job downstream (see the note on OddsEvent.event_id
@@ -202,7 +329,7 @@ class InterbetScraper(BaseScraper):
 
                 odds_events.append(
                     OddsEvent(
-                        sport="soccer",
+                        sport=fixture.get("sport", "soccer"),
                         league=fixture["league"],
                         home_team=fixture["home_team"],
                         away_team=fixture["away_team"],
