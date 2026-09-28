@@ -217,6 +217,106 @@ RUGBY_TWO_WAY_HTML = """
 """
 
 
+# Real HTML captured from a live, plain GET to Interbet's public
+# FixedOdds/LoadCouponsPartial with SportID=55/SportTypeID=55 (Tennis)
+# and VenueID=6 ("Coming up" -- Tennis's only coupon venue, same
+# single-tab situation as Rugby/Cricket; see scraper.py's
+# TENNIS_COMING_UP_VENUE_ID comment), trimmed of unrelated markup the
+# same way SAMPLE_HTML/RUGBY_SAMPLE_HTML/CRICKET_SAMPLE_HTML are. Both
+# fixtures are real, unmodified field values, chosen to exercise
+# Tennis's two distinct ParticipantName shapes seen live in the same
+# snapshot:
+#   - Adrian Arcon v Aleksandar Govedarica: both players' ParticipantName
+#     is rendered "SURNAME, First" (e.g. "ARCON, ADRIAN"), reversed from
+#     and differently cased than EventDescription's "Adrian Arcon" --
+#     proving the surname-suffix match handles the common case.
+#   - Masamichi Imamura v Petr Bar Biryukov: the home player follows the
+#     same "SURNAME, First" pattern ("IMAMURA, M" -- note the given name
+#     is *abbreviated* to a bare initial here, unlike Arcon/Govedarica),
+#     but the away player, "Petr Bar Biryukov", is rendered with no comma
+#     at all, already in the same "First Surname" order EventDescription
+#     uses -- proving both shapes are handled correctly even within one
+#     fixture. This fixture also keeps its real `participant_handicap_odds`
+#     sibling block (Market=Handicap, ParticipantName carries a point
+#     spread like "PETR BAR BIRYUKOV -0.50"), to exercise the "must not
+#     leak into moneyline" case the same way SAMPLE_HTML's second fixture
+#     does for Soccer.
+# Neither fixture has a DRAW participant button -- no live Tennis fixture
+# checked while building this adapter did (see scraper.py's
+# `_parse_fixtures` docstring): a draw isn't a possible result in tennis.
+TENNIS_SAMPLE_HTML = """
+<div class="sport">
+  <div class="sports_card">
+    <div class="sports_card_body">
+      <div class="sports_card_body_fixtures">
+        <div class="sport_fixture">
+          <div class="sport_fixture_title_group">
+            <span class="sport_fixture_title_text">29 Sep 2026 - 07:30</span>
+            <span class="sport_fixture_title_text">Adrian Arcon v Aleksandar Govedarica</span>
+          </div>
+          <div class="sport_fixture_participant_odds">
+            <div id="Event-91365623" class="participant_match_odds">
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+7%3a30%3a00+AM&amp;EventParticipantID=344567855&amp;ParticipantName=ARCON%2c+ADRIAN&amp;EventID=91365623&amp;VenueID=7630416&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=Darwin+International&amp;EventDescription=Adrian+Arcon+v+Aleksandar+Govedarica&amp;AllowMultiple=True&amp;Odds=1.18&amp;OddsDisplay=1.18&amp;InRunning=N&amp;InRunningDelay=0" id="344567855-W" class="btnOdds add_bet_link match_odds" decimalvalue="1.18" title="Bet on ARCON, ADRIAN" rel="nofollow noopener">1.18</button>
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+7%3a30%3a00+AM&amp;EventParticipantID=344567854&amp;ParticipantName=GOVEDARICA%2c+ALEKSANDAR&amp;EventID=91365623&amp;VenueID=7630416&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=Darwin+International&amp;EventDescription=Adrian+Arcon+v+Aleksandar+Govedarica&amp;AllowMultiple=True&amp;Odds=4.75&amp;OddsDisplay=4.75&amp;InRunning=N&amp;InRunningDelay=0" id="344567854-W" class="btnOdds add_bet_link match_odds" decimalvalue="4.75" title="Bet on GOVEDARICA, ALEKSANDAR" rel="nofollow noopener">4.75</button>
+            </div>
+          </div>
+        </div>
+        <div class="sport_fixture">
+          <div class="sport_fixture_title_group">
+            <span class="sport_fixture_title_text">30 Sep 2026 - 11:00</span>
+            <span class="sport_fixture_title_text">Masamichi Imamura v Petr Bar Biryukov</span>
+          </div>
+          <div class="sport_fixture_participant_odds">
+            <div id="Event-91307528" class="participant_match_odds">
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f30%2f2026+11%3a00%3a00+AM&amp;EventParticipantID=344387995&amp;ParticipantName=IMAMURA%2c+M&amp;EventID=91307528&amp;VenueID=7612961&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=ATP+Jingshan+Challenger&amp;EventDescription=Masamichi+Imamura+v+Petr+Bar+Biryukov&amp;AllowMultiple=True&amp;Odds=2&amp;OddsDisplay=2&amp;InRunning=N&amp;InRunningDelay=0" id="344387995-W" class="btnOdds add_bet_link match_odds" decimalvalue="2" title="Bet on IMAMURA, M" rel="nofollow noopener">2</button>
+              <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f30%2f2026+11%3a00%3a00+AM&amp;EventParticipantID=344387993&amp;ParticipantName=PETR+BAR+BIRYUKOV&amp;EventID=91307528&amp;VenueID=7612961&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=ATP+Jingshan+Challenger&amp;EventDescription=Masamichi+Imamura+v+Petr+Bar+Biryukov&amp;AllowMultiple=True&amp;Odds=1.8&amp;OddsDisplay=1.8&amp;InRunning=N&amp;InRunningDelay=0" id="344387993-W" class="btnOdds add_bet_link match_odds" decimalvalue="1.8" title="Bet on PETR BAR BIRYUKOV" rel="nofollow noopener">1.8</button>
+            </div>
+            <div id="Event-91307528" class="participant_handicap_odds">
+              <div class="add_bet_link_grouped">
+                <span class="handicap_value">(+0.50)</span>
+                <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f30%2f2026+11%3a00%3a00+AM&amp;EventParticipantID=344444931&amp;ParticipantName=IMAMURA%2c+M+%2b0.50&amp;EventID=91327101&amp;VenueID=7612961&amp;BetType=Win&amp;Market=Handicap&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=ATP+Jingshan+Challenger&amp;EventDescription=Masamichi+Imamura+v+Petr+Bar+Biryukov&amp;AllowMultiple=True&amp;Odds=1.95&amp;OddsDisplay=1.95&amp;InRunning=N&amp;InRunningDelay=0" id="344444931-W" class="btnOdds add_bet_link handicap_odds" decimalvalue="1.95" title="Bet on IMAMURA, M +0.50" rel="nofollow noopener">1.95</button>
+              </div>
+              <div class="add_bet_link_grouped">
+                <span class="handicap_value">(-0.50)</span>
+                <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f30%2f2026+11%3a00%3a00+AM&amp;EventParticipantID=344444930&amp;ParticipantName=PETR+BAR+BIRYUKOV+-0.50&amp;EventID=91327101&amp;VenueID=7612961&amp;BetType=Win&amp;Market=Handicap&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=ATP+Jingshan+Challenger&amp;EventDescription=Masamichi+Imamura+v+Petr+Bar+Biryukov&amp;AllowMultiple=True&amp;Odds=1.85&amp;OddsDisplay=1.85&amp;InRunning=N&amp;InRunningDelay=0" id="344444930-W" class="btnOdds add_bet_link handicap_odds" decimalvalue="1.85" title="Bet on PETR BAR BIRYUKOV -0.50" rel="nofollow noopener">1.85</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+"""
+
+# Real HTML captured from the same live Tennis "Coming up" coupon as
+# TENNIS_SAMPLE_HTML, for a doubles fixture (Anastasia Detiuc / Irina
+# Khromacheva v Sofia Costoulas / Ingrid Gamarra Martins, from the "WTA
+# Jingshan 125K Series Doubles" competition). Interbet renders a doubles
+# ParticipantName as both players' "Surname, First" joined by "/" (e.g.
+# "DETIUC, ANASTASIA/KHROMACHEVA, IRINA"), which doesn't reduce to a
+# single trailing surname the way a singles ParticipantName does --
+# see scraper.py's `_participant_matches_team` docstring for why this is
+# a deliberate, documented gap rather than a bug: this fixture proves
+# that gap fails *safe* (both buttons go unmatched and the fixture is
+# dropped for having no home/away price at all) instead of mismatching
+# the odds to the wrong pairing.
+TENNIS_DOUBLES_HTML = """
+<div class="sport_fixture">
+  <div class="sport_fixture_title_group">
+    <span class="sport_fixture_title_text">29 Sep 2026 - 09:00</span>
+    <span class="sport_fixture_title_text">Anastasia Detiuc / Irina Khromacheva v Sofia Costoulas / Ingrid Gamarra Martins</span>
+  </div>
+  <div class="sport_fixture_participant_odds">
+    <div id="Event-91338463" class="participant_match_odds">
+      <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+9%3a00%3a00+AM&amp;EventParticipantID=344479631&amp;ParticipantName=COSTOULAS%2c+SOFIA%2fGAMARRA+MARTINS%2c+INGRID&amp;EventID=91338463&amp;VenueID=7613942&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=WTA+Jingshan+125K+Series+Doubles&amp;EventDescription=Anastasia+Detiuc+%2f+Irina+Khromacheva+v+Sofia+Costoulas+%2f+Ingrid+Gamarra+Martins&amp;AllowMultiple=True&amp;Odds=2.8&amp;OddsDisplay=2.8&amp;InRunning=N&amp;InRunningDelay=0" id="344479631-W" class="btnOdds add_bet_link match_odds" decimalvalue="2.8" title="Bet on COSTOULAS, SOFIA/GAMARRA MARTINS, INGRID" rel="nofollow noopener">2.8</button>
+      <button type="button" data-url="/FixedOdds/AddBet?EventDate=9%2f29%2f2026+9%3a00%3a00+AM&amp;EventParticipantID=344479632&amp;ParticipantName=DETIUC%2c+ANASTASIA%2fKHROMACHEVA%2c+IRINA&amp;EventID=91338463&amp;VenueID=7613942&amp;BetType=Win&amp;Market=Match+Result&amp;SportType=Tennis&amp;ImgId=55&amp;EventGroup=WTA+Jingshan+125K+Series+Doubles&amp;EventDescription=Anastasia+Detiuc+%2f+Irina+Khromacheva+v+Sofia+Costoulas+%2f+Ingrid+Gamarra+Martins&amp;AllowMultiple=True&amp;Odds=1.45&amp;OddsDisplay=1.45&amp;InRunning=N&amp;InRunningDelay=0" id="344479632-W" class="btnOdds add_bet_link match_odds" decimalvalue="1.45" title="Bet on DETIUC, ANASTASIA/KHROMACHEVA, IRINA" rel="nofollow noopener">1.45</button>
+    </div>
+  </div>
+</div>
+"""
+
+
 def test_parse_fixtures_extracts_teams_league_date_and_odds():
     fixtures = InterbetScraper._parse_fixtures(SAMPLE_HTML)
 
@@ -342,15 +442,16 @@ def test_parse_fixtures_skips_a_button_missing_a_required_field():
     assert InterbetScraper._parse_fixtures(html) == []
 
 
-def test_default_sports_config_covers_soccer_rugby_and_cricket_with_the_real_ids():
+def test_default_sports_config_covers_soccer_rugby_cricket_and_tennis_with_the_real_ids():
     """Locks in the discovered SportID/SportTypeID/VenueID values (see the
     comments above SPORTS in scraper.py for how each was confirmed against
-    the live site) so a future refactor can't silently drop Rugby/Cricket or
-    revert either one's VenueID to Soccer's."""
+    the live site) so a future refactor can't silently drop Rugby/Cricket/
+    Tennis or revert any of their VenueIDs to Soccer's (or to each other's --
+    Rugby=53, Cricket=29 and Tennis=6 are all genuinely distinct)."""
     scraper = InterbetScraper()
 
     by_sport = {cfg.sport: cfg for cfg in scraper.sports}
-    assert set(by_sport) == {"soccer", "rugby", "cricket"}
+    assert set(by_sport) == {"soccer", "rugby", "cricket", "tennis"}
 
     assert by_sport["soccer"] == SportConfig(
         sport="soccer",
@@ -377,6 +478,16 @@ def test_default_sports_config_covers_soccer_rugby_and_cricket_with_the_real_ids
         sport_id=59,
         venue_id=29,
         sport_description="Cricket",
+        venue_description="Coming up",
+        country="",
+        cou_id="",
+        order=1,
+    )
+    assert by_sport["tennis"] == SportConfig(
+        sport="tennis",
+        sport_id=55,
+        venue_id=6,
+        sport_description="Tennis",
         venue_description="Coming up",
         country="",
         cou_id="",
@@ -513,6 +624,87 @@ def test_to_odds_events_maps_cricket_fixtures_onto_the_universal_schema():
     assert event.markets["moneyline"].draw_odds is None
 
 
+def test_parse_fixtures_tags_tennis_fixtures_and_matches_surname_first_participant_names():
+    """Adrian Arcon v Aleksandar Govedarica: both ParticipantNames are
+    "SURNAME, First" (reversed and differently cased from EventDescription's
+    "First Surname") -- proving the surname-suffix match in
+    `_participant_matches_team` correctly pairs each button with its
+    player despite the reordering."""
+    fixtures = InterbetScraper._parse_fixtures(TENNIS_SAMPLE_HTML, sport="tennis")
+
+    assert len(fixtures) == 2
+    assert all(f["sport"] == "tennis" for f in fixtures)
+
+    arcon = next(f for f in fixtures if f["home_team"] == "Adrian Arcon")
+    assert arcon["away_team"] == "Aleksandar Govedarica"
+    assert arcon["league"] == "Darwin International"
+    assert arcon["home_odds"] == 1.18
+    assert arcon["away_odds"] == 4.75
+    assert arcon["draw_odds"] is None  # tennis can't end in a draw
+
+
+def test_parse_fixtures_handles_an_abbreviated_given_name_and_a_no_comma_participant_name():
+    """Masamichi Imamura v Petr Bar Biryukov exercises two more real
+    ParticipantName shapes in the same fixture:
+      - "IMAMURA, M" -- "Surname, First" but with the given name
+        abbreviated to a bare initial, which a naive comma-reversal
+        would never match against "Masamichi Imamura" -- only matching
+        on the surname handles this.
+      - "PETR BAR BIRYUKOV" -- no comma at all, already in the same
+        "First Surname" order as EventDescription's "Petr Bar Biryukov",
+        which the plain equality fallback handles directly.
+    Also proves the real captured `participant_handicap_odds` sibling
+    block (Market=Handicap, e.g. "PETR BAR BIRYUKOV -0.50") doesn't leak
+    into the moneyline market, the same div-class scoping already
+    proven for Soccer/Rugby."""
+    fixtures = InterbetScraper._parse_fixtures(TENNIS_SAMPLE_HTML, sport="tennis")
+
+    imamura = next(f for f in fixtures if f["home_team"] == "Masamichi Imamura")
+    assert imamura["away_team"] == "Petr Bar Biryukov"
+    assert imamura["league"] == "ATP Jingshan Challenger"
+    assert imamura["home_odds"] == 2
+    assert imamura["away_odds"] == 1.8
+    # None of the handicap odds (e.g. 1.95/1.85) leaked in.
+    assert 1.95 not in (imamura["home_odds"], imamura["away_odds"])
+    assert 1.85 not in (imamura["home_odds"], imamura["away_odds"])
+
+
+def test_to_odds_events_maps_tennis_fixtures_onto_the_universal_schema():
+    scraper = InterbetScraper()
+    raw = {"fixtures": InterbetScraper._parse_fixtures(TENNIS_SAMPLE_HTML, sport="tennis")}
+
+    events = scraper.to_odds_events(raw)
+
+    assert len(events) == 2
+    event = next(e for e in events if e.home_team == "Adrian Arcon")
+    assert event.away_team == "Aleksandar Govedarica"
+    assert event.sport == "tennis"
+    assert event.league == "Darwin International"
+    assert event.bookmaker == "interbet"
+    assert event.markets["moneyline"].home_odds == 1.18
+    assert event.markets["moneyline"].away_odds == 4.75
+    assert event.markets["moneyline"].draw_odds is None
+
+
+def test_parse_fixtures_skips_a_doubles_fixture_rather_than_mismatching_its_odds():
+    """Interbet renders a doubles ParticipantName as both players' names
+    joined by "/" (e.g. "DETIUC, ANASTASIA/KHROMACHEVA, IRINA"), which
+    doesn't reduce to a single trailing surname the way singles does.
+    Both buttons must go unmatched -- and the fixture dropped for having
+    no home/away price -- rather than being guessed into the wrong
+    pairing."""
+    fixtures = InterbetScraper._parse_fixtures(TENNIS_DOUBLES_HTML, sport="tennis")
+
+    assert len(fixtures) == 1
+    fixture = fixtures[0]
+    assert fixture["home_odds"] is None
+    assert fixture["away_odds"] is None
+
+    scraper = InterbetScraper()
+    events = scraper.to_odds_events({"fixtures": fixtures})
+    assert events == []  # incomplete market, correctly never published
+
+
 def test_to_odds_events_defaults_untagged_fixtures_to_soccer():
     """A raw fixture dict with no "sport" key at all (the shape every
     pre-Rugby caller/test builds by hand) must still map onto sport
@@ -545,7 +737,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     """fetch_raw_odds must hit LoadCouponsPartial once per sport in
     self.sports (not just Soccer), passing each sport's own VenueID/
     SportID/SportTypeID/VenueDescription/SportDescription/Country/CouID,
-    and combine all three sports' fixtures -- tagged correctly -- into one
+    and combine all four sports' fixtures -- tagged correctly -- into one
     flat list for to_odds_events to consume."""
     scraper = InterbetScraper()
     requested_params = []
@@ -563,14 +755,16 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
             return FakeResponse(SAMPLE_HTML)
         if params["SportDescription"] == "Rugby":
             return FakeResponse(RUGBY_SAMPLE_HTML)
-        return FakeResponse(CRICKET_SAMPLE_HTML)
+        if params["SportDescription"] == "Cricket":
+            return FakeResponse(CRICKET_SAMPLE_HTML)
+        return FakeResponse(TENNIS_SAMPLE_HTML)
 
     monkeypatch.setattr(scraper._client, "get", fake_get)
 
     raw = await scraper.fetch_raw_odds()
 
-    assert len(requested_params) == 3
-    soccer_params, rugby_params, cricket_params = requested_params
+    assert len(requested_params) == 4
+    soccer_params, rugby_params, cricket_params, tennis_params = requested_params
     assert soccer_params["SportID"] == 48
     assert soccer_params["VenueID"] == 65
     assert rugby_params["SportID"] == 50
@@ -581,6 +775,10 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     assert cricket_params["VenueID"] == 29
     assert cricket_params["Country"] == ""
     assert cricket_params["CouID"] == ""
+    assert tennis_params["SportID"] == 55
+    assert tennis_params["VenueID"] == 6
+    assert tennis_params["Country"] == ""
+    assert tennis_params["CouID"] == ""
 
     fixtures_by_sport = {}
     for f in raw["fixtures"]:
@@ -588,6 +786,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     assert len(fixtures_by_sport["soccer"]) == 2
     assert len(fixtures_by_sport["rugby"]) == 2  # Taranaki v Wellington excluded, no moneyline posted
     assert len(fixtures_by_sport["cricket"]) == 2
+    assert len(fixtures_by_sport["tennis"]) == 2
 
     events = scraper.to_odds_events(raw)
     events_by_sport = {}
@@ -596,6 +795,7 @@ async def test_fetch_raw_odds_fetches_every_configured_sport_and_tags_each_fixtu
     assert len(events_by_sport["soccer"]) == 2
     assert len(events_by_sport["rugby"]) == 2
     assert len(events_by_sport["cricket"]) == 2
+    assert len(events_by_sport["tennis"]) == 2
 
 
 @pytest.mark.asyncio

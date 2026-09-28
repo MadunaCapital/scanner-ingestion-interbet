@@ -8,11 +8,11 @@ no stealth browser, and no Cloudflare bypass: verified with a completely
 bare `curl` (no User-Agent, no cookies, no Referer) returning the exact
 same payload as a normal browser session, so none of that is needed
 here, same as Betway ZA and WSB. This adapter polls the same endpoint
-for three sports each cycle -- Soccer, Rugby (South Africa's #2 sport)
-and Cricket -- using different SportID/SportTypeID/VenueID query values
-for each; all three were confirmed open with the same bare-curl test, no
-new auth or anti-bot workaround needed for Rugby or Cricket, it's
-genuinely the same feed.
+for four sports each cycle -- Soccer, Rugby (South Africa's #2 sport),
+Cricket and Tennis -- using different SportID/SportTypeID/VenueID query
+values for each; all four were confirmed open with the same bare-curl
+test, no new auth or anti-bot workaround needed for Rugby, Cricket or
+Tennis, it's genuinely the same feed.
 
 Unlike Betway ZA and WSB, this endpoint returns a server-rendered HTML
 fragment (an ASP.NET MVC partial view), not JSON -- the site has no JSON
@@ -29,15 +29,23 @@ odds button embeds its EventID/ParticipantName/Odds/EventDate/EventGroup
 as a query string in its `data-url` attribute (the URL the page's own JS
 would POST to place a bet), so parsing means reading those attributes,
 not scraping prose -- no more fragile than reading JSON keys. This is
-true for Soccer, Rugby and Cricket alike -- same markup, same
+true for Soccer, Rugby, Cricket and Tennis alike -- same markup, same
 query-string shape, just a different SportType label and Market name
 ("Match Odds" vs "Match Result") inside it, neither of which this parser
 even reads.
 
+Tennis's own quirk (see `_participant_matches_team` below): Interbet
+renders a singles player's ParticipantName as "SURNAME, First" -- the
+reverse order of, and sometimes with the given name abbreviated to just
+an initial compared to, the full "First Surname" used in the fixture's
+own EventDescription -- so it needs its own name-matching rule, not just
+the hyphen/case folding `_normalize_name` already does for team sports.
+
 Endpoint discovered by ordinary browsing (curl against the pages
-interbet.co.za/Prematch/Sport/Soccer/*, .../Prematch/Sport/Rugby/* and
-.../Prematch/Sport/Cricket/* themselves link to) and inspecting the
-`data-url` the page's own sport.js issues via `$.ajax` GET.
+interbet.co.za/Prematch/Sport/Soccer/*, .../Prematch/Sport/Rugby/*,
+.../Prematch/Sport/Cricket/* and .../Prematch/Sport/Tennis/* themselves
+link to) and inspecting the `data-url` the page's own sport.js issues via
+`$.ajax` GET.
 """
 
 import asyncio
@@ -62,9 +70,9 @@ class SportConfig(NamedTuple):
     onto OddsEvent.sport, plus everything LoadCouponsPartial needs on its
     query string to return that sport's single broadest coupon in one
     call. See the SPORTS tuple below for how each field was chosen per
-    sport -- Soccer, Rugby and Cricket don't share the same VenueID or
-    even the same notion of "broadest", so this is deliberately not one
-    shared constant with a swapped-in SportID.
+    sport -- Soccer, Rugby, Cricket and Tennis don't share the same
+    VenueID or even the same notion of "broadest", so this is
+    deliberately not one shared constant with a swapped-in SportID.
     """
 
     sport: str
@@ -120,9 +128,24 @@ RUGBY_COMING_UP_VENUE_ID = 53
 CRICKET_SPORT_ID = 59
 CRICKET_COMING_UP_VENUE_ID = 29
 
+# SportID=55 is Interbet's sport-level id for Tennis -- discovered the
+# same way as Soccer, Rugby and Cricket: rendering /Prematch/Sport/Tennis
+# and reading the SportID/SportTypeID its default coupons-container
+# data-url embeds (VenueID=6, distinct from every other sport's "Coming
+# up" VenueID -- Rugby's is 53, Cricket's is 29 -- confirming this isn't
+# shared across sports and really was read off Tennis's own page, not
+# assumed). Tennis's nav bar on /Prematch/Sport/Tennis renders exactly
+# one tab -- "Coming up" -- same single-venue situation as Rugby and
+# Cricket, no separate "All Leagues 24H" to choose instead. Confirmed
+# populated with a live fetch: over 260 fixtures (singles and doubles)
+# across dozens of ATP/WTA/Challenger/ITF competitions worldwide, not
+# clipped to a narrow window.
+TENNIS_SPORT_ID = 55
+TENNIS_COMING_UP_VENUE_ID = 6
+
 # The exact query values captured from each sport's own default
-# coupons-container data-url (see comments above) -- Rugby's and
-# Cricket's Country and CouID are genuinely empty strings there, not a
+# coupons-container data-url (see comments above) -- Rugby's, Cricket's
+# and Tennis's Country and CouID are genuinely empty strings there, not a
 # placeholder, unlike Soccer's "International"/"INT".
 SPORTS: tuple[SportConfig, ...] = (
     SportConfig(
@@ -150,6 +173,16 @@ SPORTS: tuple[SportConfig, ...] = (
         sport_id=CRICKET_SPORT_ID,
         venue_id=CRICKET_COMING_UP_VENUE_ID,
         sport_description="Cricket",
+        venue_description="Coming up",
+        country="",
+        cou_id="",
+        order=1,
+    ),
+    SportConfig(
+        sport="tennis",
+        sport_id=TENNIS_SPORT_ID,
+        venue_id=TENNIS_COMING_UP_VENUE_ID,
+        sport_description="Tennis",
         venue_description="Coming up",
         country="",
         cou_id="",
@@ -186,8 +219,62 @@ def _normalize_name(name: str) -> str:
     ParticipantName pairs with the exact same casing/hyphenation
     inconsistency (provincial/union names and, for Cricket, hyphenated
     or multi-word team names are just as likely to trip this up as a
-    country name is), so the same collapsing is needed there too."""
+    country name is), so the same collapsing is needed there too.
+
+    Reused for Tennis too, but not on its own -- see
+    `_participant_matches_team` below, which layers Tennis's own
+    "Surname, First" ParticipantName ordering on top of this same
+    case/hyphen folding rather than replacing it."""
     return " ".join(name.replace("-", " ").split()).lower()
+
+
+def _participant_matches_team(participant_name: str, team_name: str, sport: str) -> bool:
+    """Whether an odds button's ParticipantName refers to the given
+    home/away team or player.
+
+    Soccer, Rugby and Cricket: ParticipantName and the team name pulled
+    from EventDescription are the same string modulo case and hyphenation
+    (see `_normalize_name`) -- a straight equality check after folding
+    both, as this adapter has always done.
+
+    Tennis is different: Interbet renders a singles player's
+    ParticipantName as "SURNAME, First" -- reversed from, and often with
+    the given name abbreviated down to a bare initial compared to, the
+    full "First Surname" order EventDescription uses for the same player
+    (confirmed against Interbet's own live "Coming up" Tennis coupon,
+    e.g. ParticipantName "STORCH, S" for a player EventDescription spells
+    out in full as "Stefan Storch"). Reversing the comma therefore isn't
+    reliable -- "S" will never equal "Stefan" -- but the surname (the
+    part before the comma, which Interbet always renders in full, hyphen
+    and all, e.g. "BRUCE-SMITH, JACK") is: this matches by checking that
+    the team name's normalized words *end with* the participant's
+    normalized surname word(s), independent of whether the given name
+    agrees or was abbreviated at all.
+
+    Some Tennis fixtures buck even that pattern and render ParticipantName
+    with no comma at all, already in the same "First Surname" order
+    EventDescription uses (e.g. "PETR BAR BIRYUKOV", observed live
+    alongside a same-fixture opponent rendered the usual "SURNAME, First"
+    way) -- those fall through to the plain equality check below, which
+    already handles them correctly with no special casing needed.
+
+    Doubles fixtures are a known, deliberately out-of-scope gap: Interbet
+    joins both players' "Surname, First" names with a "/" in
+    ParticipantName (e.g. "DETIUC, ANASTASIA/KHROMACHEVA, IRINA"), which
+    doesn't reduce to a single trailing surname the way singles does.
+    Neither the home nor away check below matches that shape, so a
+    doubles fixture's buttons are logged as unmatched and it is silently
+    dropped by `to_odds_events`'s existing "both prices must be present"
+    check -- never mismatched to the wrong team, just not published.
+    Widening this to also parse doubles pairs was left out as unwarranted
+    complexity for a first cut; nothing here would need to change to add
+    it later, since this is purely a matching predicate.
+    """
+    if sport == "tennis" and "," in participant_name:
+        surname_words = _normalize_name(participant_name.split(",", 1)[0]).split()
+        team_words = _normalize_name(team_name).split()
+        return bool(surname_words) and team_words[-len(surname_words):] == surname_words
+    return _normalize_name(participant_name) == _normalize_name(team_name)
 
 
 class InterbetScraper(BaseScraper):
@@ -199,7 +286,7 @@ class InterbetScraper(BaseScraper):
 
     async def fetch_raw_odds(self) -> dict:
         """GETs the HTML coupons partial for every sport in self.sports
-        (Soccer, Rugby and Cricket by default) and extracts each
+        (Soccer, Rugby, Cricket and Tennis by default) and extracts each
         fixture's structured fields from its odds buttons' `data-url`
         query strings, returning one combined dict of already-flattened
         fixture records, each tagged with which sport it came from.
@@ -241,10 +328,10 @@ class InterbetScraper(BaseScraper):
         (keyed by EventID), each holding whatever home/away/draw odds
         were found on its "Match Odds"/"Match Result" (1X2) buttons, and
         tagged with `sport` (the value fetch_raw_odds calls this with --
-        "soccer", "rugby" or "cricket" -- defaulted here to "soccer" so
-        every existing call site and test that predates Rugby/Cricket
-        support, which only ever passed one positional `html` argument,
-        keeps working unchanged).
+        "soccer", "rugby", "cricket" or "tennis" -- defaulted here to
+        "soccer" so every existing call site and test that predates
+        Rugby/Cricket/Tennis support, which only ever passed one
+        positional `html` argument, keeps working unchanged).
 
         Scoped to `div.participant_match_odds` specifically -- Interbet
         renders handicap and double-chance odds for the same fixture in
@@ -282,7 +369,23 @@ class InterbetScraper(BaseScraper):
         assumes either way -- the same Draw-optional handling used for
         Rugby applies unchanged, so a three-way Cricket fixture (if
         Interbet ever posts one) would come through with draw_odds set,
-        not get coerced into a two-way struct.
+        not get coerced into a two-way struct. Tennis's "Match Result"
+        market is genuinely always two-way (no draw is possible in
+        tennis, so Interbet never renders a DRAW button for it at all --
+        confirmed against over 260 live singles and doubles fixtures);
+        draw_odds simply stays None for every Tennis fixture, the same
+        optional-field path Rugby/Cricket already exercise, not a
+        separate code path.
+
+        Participant matching (which button's odds go to home_odds vs
+        away_odds) is delegated to `_participant_matches_team` rather
+        than a bare `_normalize_name` equality check, because Tennis
+        renders ParticipantName in a different order ("Surname, First",
+        sometimes with the given name abbreviated) than EventDescription
+        does ("First Surname") -- see that function's docstring for the
+        full explanation, including why a doubles fixture's participants
+        deliberately fail to match either side and get dropped rather
+        than mismatched.
 
         Defensive per-fixture and per-button: a single malformed card
         must not lose every other fixture in the same snapshot.
@@ -327,12 +430,11 @@ class InterbetScraper(BaseScraper):
                 },
             )
 
-            name = _normalize_name(participant_name)
-            if name == _normalize_name(home_name):
+            if _participant_matches_team(participant_name, home_name, sport):
                 fixture["home_odds"] = odds
-            elif name == _normalize_name(away_name):
+            elif _participant_matches_team(participant_name, away_name, sport):
                 fixture["away_odds"] = odds
-            elif name == "draw":
+            elif _normalize_name(participant_name) == "draw":
                 fixture["draw_odds"] = odds
             else:
                 logger.warning("Unmatched participant %r for fixture %s v %s", participant_name, home_name, away_name)
@@ -345,9 +447,10 @@ class InterbetScraper(BaseScraper):
         Result / 1X2) market only for now, matching Betway ZA and WSB's
         scope. `draw_odds` is left None on MarketOdds for a fixture whose
         market never had a Draw price (a real, valid shape for some Rugby
-        competitions, and for every Cricket fixture observed live so far
-        -- not a missing-data bug) -- MarketOdds already models it as
-        optional for exactly this reason.
+        competitions, for every Cricket fixture observed live so far, and
+        for every Tennis fixture -- a draw is not a possible result in
+        tennis at all -- not a missing-data bug) -- MarketOdds already
+        models it as optional for exactly this reason.
 
         `fixture.get("sport", "soccer")` rather than a bare "soccer"
         literal: raw fixture dicts built by _parse_fixtures are tagged
